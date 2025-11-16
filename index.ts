@@ -17,7 +17,7 @@ class UploadMCPServer {
     this.server = new Server(
       {
         name: '@zhigang1992/uploadfile-mcp',
-        version: '1.0.1',
+        version: '1.2.0',
       },
       {
         capabilities: {
@@ -27,6 +27,79 @@ class UploadMCPServer {
     );
 
     this.setupToolHandlers();
+  }
+
+  private detectContentType(filePath: string): string {
+    const ext = extname(filePath).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      // Images
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.bmp': 'image/bmp',
+      '.ico': 'image/x-icon',
+      '.tiff': 'image/tiff',
+      '.tif': 'image/tiff',
+
+      // Documents
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+
+      // Text
+      '.txt': 'text/plain',
+      '.html': 'text/html',
+      '.htm': 'text/html',
+      '.css': 'text/css',
+      '.js': 'text/javascript',
+      '.mjs': 'text/javascript',
+      '.json': 'application/json',
+      '.xml': 'application/xml',
+      '.csv': 'text/csv',
+      '.md': 'text/markdown',
+
+      // Archives
+      '.zip': 'application/zip',
+      '.tar': 'application/x-tar',
+      '.gz': 'application/gzip',
+      '.7z': 'application/x-7z-compressed',
+      '.rar': 'application/vnd.rar',
+
+      // Audio
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+      '.m4a': 'audio/mp4',
+      '.flac': 'audio/flac',
+
+      // Video
+      '.mp4': 'video/mp4',
+      '.avi': 'video/x-msvideo',
+      '.mov': 'video/quicktime',
+      '.wmv': 'video/x-ms-wmv',
+      '.webm': 'video/webm',
+      '.mkv': 'video/x-matroska',
+
+      // Code
+      '.ts': 'text/typescript',
+      '.tsx': 'text/typescript',
+      '.py': 'text/x-python',
+      '.java': 'text/x-java',
+      '.c': 'text/x-c',
+      '.cpp': 'text/x-c++',
+      '.rs': 'text/x-rust',
+      '.go': 'text/x-go',
+    };
+
+    // Return detected MIME type or default to image/jpeg if unknown
+    return mimeMap[ext] || 'image/jpeg';
   }
 
   private setupToolHandlers() {
@@ -42,6 +115,10 @@ class UploadMCPServer {
                 file_path: {
                   type: 'string',
                   description: 'Local path to the file to upload',
+                },
+                content_type: {
+                  type: 'string',
+                  description: 'Optional MIME type of the file (e.g., image/png, text/plain, application/pdf). If not provided, will be auto-detected from file extension.',
                 },
               },
               required: ['file_path'],
@@ -91,8 +168,10 @@ class UploadMCPServer {
 
   private async handleUploadFile(args: {
     file_path: string;
+    content_type?: string;
   }) {
     const { file_path } = args;
+    let content_type = args.content_type;
 
     if (!file_path) {
       throw new McpError(
@@ -117,12 +196,18 @@ class UploadMCPServer {
       const originalFileName = basename(file_path);
       const remotePath = `${folderId}/${originalFileName}`;
 
+      // Determine content type if not provided
+      if (!content_type) {
+        content_type = this.detectContentType(file_path);
+      }
+
       // Upload to S3-compatible storage using curl
       const uploadCommand = [
         'curl',
         '-X', 'PUT',
         `https://s3.reily.app/public/${remotePath}`,
         '-T', file_path,
+        '-H', `Content-Type: ${content_type}`,
         '--silent',
         '--fail'
       ];
@@ -154,6 +239,7 @@ class UploadMCPServer {
               file_path: file_path,
               folder_id: folderId,
               original_filename: originalFileName,
+              content_type: content_type,
               remote_path: remotePath,
               url: publicUrl,
               message: `File uploaded successfully to ${publicUrl}`
