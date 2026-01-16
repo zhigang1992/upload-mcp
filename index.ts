@@ -47,11 +47,9 @@ function signRequest(
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
   const dateStamp = amzDate.slice(0, 8);
 
-  // Create canonical URI (URL-encode each path segment)
-  const canonicalUri = url.pathname
-    .split('/')
-    .map((segment) => encodeURIComponent(segment))
-    .join('/');
+  // Use the already-encoded pathname from the URL object
+  // The URL constructor already properly encodes the path
+  const canonicalUri = url.pathname;
 
   // Create canonical query string (sorted by parameter name)
   const params = new URLSearchParams(url.search);
@@ -527,7 +525,8 @@ class UploadMCPServer {
       // Upload to S3 (automatically uses multipart for large files)
       const { size, multipart } = await this.uploadToS3(file_path, remotePath, content_type);
 
-      const publicUrl = `${S3_ENDPOINT}/${S3_BUCKET}/${remotePath}`;
+      const encodedPath = remotePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+      const publicUrl = `${S3_ENDPOINT}/${S3_BUCKET}/${encodedPath}`;
 
       return {
         content: [
@@ -621,7 +620,8 @@ class UploadMCPServer {
         // Upload to S3 (automatically uses multipart for large files)
         const { size, multipart } = await this.uploadToS3(tempFilePath, remotePath, detectedMimeType);
 
-        const publicUrl = `${S3_ENDPOINT}/${S3_BUCKET}/${remotePath}`;
+        const encodedPath = remotePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+        const publicUrl = `${S3_ENDPOINT}/${S3_BUCKET}/${encodedPath}`;
 
         return {
           content: [
